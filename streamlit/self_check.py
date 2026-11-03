@@ -49,8 +49,8 @@ assert label in CLASS_NAMES and 0 <= confidence <= 1 and elapsed_ms >= 0
 app = AppTest.from_file(str(Path(__file__).with_name("app.py"))).run(timeout=120)
 assert not app.exception, app.exception
 assert app.button[0].disabled
-assert app.radio[0].value == "Satu foto"
-app.radio[0].set_value("Satu folder").run()
+assert app.radio[0].value == "Foto"
+app.radio[0].set_value("Folder").run()
 assert not app.exception, app.exception
 assert app.button[0].disabled
 assert app.get("file_uploader")[0].proto.max_upload_size_mb == 10
@@ -71,4 +71,17 @@ with patch("streamlit.file_uploader", return_value=photo):
     assert any("Waktu inferensi:" in item.value for item in app.caption)
     assert any("Prediksi selesai" in item.label for item in app.get("status"))
 
-print("LULUS: validasi foto, DenseNet-121, khasiat langsung, dan tampilan tanpa label asli/sidebar.")
+folder_files = [
+    SimpleNamespace(file_id="folder-1", name="daun-1.png", size=len(photo_data), getvalue=lambda: photo_data),
+    SimpleNamespace(file_id="folder-2", name="daun-2.png", size=len(photo_data), getvalue=lambda: photo_data),
+]
+with patch("streamlit.file_uploader", side_effect=lambda *args, **kwargs: folder_files if kwargs["key"] == "folder" else None):
+    app = AppTest.from_file(str(Path(__file__).with_name("app.py"))).run(timeout=120)
+    app.radio[0].set_value("Folder").run(timeout=120)
+    assert not app.button[0].disabled
+    app.button[0].click().run(timeout=120)
+    assert not app.exception, app.exception
+    assert set(app.session_state["predictions"]) == {"folder-1", "folder-2"}
+    assert sum("Nama daun:" in item.value for item in app.get("markdown")) == 2
+
+print("LULUS: validasi foto, DenseNet-121, dan prediksi beberapa foto dari mode Folder.")

@@ -109,13 +109,13 @@ def main():
     st.html('<p class="intro">Unggah foto daun untuk melihat prediksi DenseNet-121 dan informasi tanamannya.</p>')
 
     with st.container(key="upload"):
-        st.html('<h2>Pilih foto daun</h2>')
-        mode = st.radio("Cara unggah", ["Satu foto", "Satu folder"], horizontal=True, label_visibility="collapsed")
-        if mode == "Satu foto":
-            photo = st.file_uploader("Unggah satu foto", type=["png", "jpg", "jpeg"], max_upload_size=10, key="photo")
+        st.html('<h2>Masukan foto daun</h2>')
+        mode = st.radio("Cara unggah", ["Foto", "Folder"], horizontal=True, label_visibility="collapsed")
+        if mode == "Foto":
+            photo = st.file_uploader("Unggah foto", type=["png", "jpg", "jpeg"], max_upload_size=10, key="photo")
             files = [photo] if photo else []
         else:
-            files = st.file_uploader("Unggah satu folder", type=["png", "jpg", "jpeg"], accept_multiple_files="directory", max_upload_size=10, key="folder")
+            files = st.file_uploader("Unggah folder", type=["png", "jpg", "jpeg"], accept_multiple_files="directory", max_upload_size=10, key="folder")
         st.caption("PNG atau JPG · Maks. 10 MB per foto · Maks. 20 foto per proses")
 
         # ponytail: proses dibatasi 20 foto; gunakan paginasi bila kebutuhan batch bertambah.
