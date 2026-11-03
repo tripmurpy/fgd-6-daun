@@ -1,4 +1,4 @@
-"""Perbandingan inferensi LWDN dan DenseNet-121 untuk foto daun."""
+"""Inferensi DenseNet-121 untuk foto daun."""
 
 from io import BytesIO
 import json
@@ -45,17 +45,14 @@ def read_image(data):
         raise ValueError("Resolusi foto terlalu besar. Gunakan maksimal 20 megapiksel.") from error
 
 
-@st.cache_resource
-def load_models():
+@st.cache_resource(show_spinner=False)
+def load_model():
     import tensorflow as tf
 
-    return {
-        "LWDN": tf.keras.models.load_model(MODEL_DIR / "lwdn.keras", compile=False),
-        "DenseNet-121": tf.keras.models.load_model(MODEL_DIR / "densenet121.keras", compile=False),
-    }
+    return tf.keras.models.load_model(MODEL_DIR / "densenet121.keras", compile=False)
 
 
-def predict(data, models):
+def predict(data, model):
     from tensorflow.keras.applications.densenet import preprocess_input
 
     with Image.open(BytesIO(data)) as image:
@@ -65,24 +62,21 @@ def predict(data, models):
     canvas = Image.new("RGB", (224, 224), "white")
     canvas.paste(image, ((224 - image.width) // 2, (224 - image.height) // 2))
     batch = preprocess_input(np.asarray(canvas, dtype="float32")[None, ...])
-    results = {}
-    for name, model in models.items():
-        start = perf_counter()
-        probabilities = model(batch, training=False).numpy()[0]
-        elapsed_ms = (perf_counter() - start) * 1000
-        if probabilities.shape != (len(CLASS_NAMES),) or not np.isfinite(probabilities).all():
-            raise ValueError(f"Keluaran {name} tidak valid.")
-        index = int(np.argmax(probabilities))
-        results[name] = (CLASS_NAMES[index], float(probabilities[index]), elapsed_ms)
-    return results
+    start = perf_counter()
+    probabilities = model(batch, training=False).numpy()[0]
+    elapsed_ms = (perf_counter() - start) * 1000
+    if probabilities.shape != (len(CLASS_NAMES),) or not np.isfinite(probabilities).all():
+        raise ValueError("Keluaran model tidak valid.")
+    index = int(np.argmax(probabilities))
+    return CLASS_NAMES[index], float(probabilities[index]), elapsed_ms
 
 
 def main():
-    st.set_page_config(page_title="HerbLeaf AI", page_icon=":material/eco:", layout="centered")
+    st.set_page_config(page_title="HerbLeaf AI", page_icon=":material/eco:", layout="wide")
     st.html("""
     <style>
     .stApp { background: #f6f8f3; }
-    .stMainBlockContainer { max-width: 960px; padding-top: 2.2rem; padding-bottom: 2rem; }
+    .stMainBlockContainer { max-width: 1100px; padding-top: 2.2rem; padding-bottom: 2rem; }
     h1 { font-size: clamp(2rem, 5vw, 2.8rem) !important; letter-spacing: -.05em; padding: 0 0 .5rem !important; }
     h2 { font-size: 1.25rem !important; letter-spacing: -.025em; margin: 0 !important; padding: 0 0 .3rem !important; }
     h3 { font-size: 1.05rem !important; }
@@ -112,7 +106,7 @@ def main():
 
     st.html('<div class="brand">HerbLeaf AI <small>Tanaman obat Indonesia</small></div>')
     st.title("HerbLeaf AI")
-    st.html('<p class="intro">Unggah foto daun untuk membandingkan prediksi LWDN dan DenseNet-121.</p>')
+    st.html('<p class="intro">Unggah foto daun untuk melihat prediksi DenseNet-121 dan informasi tanamannya.</p>')
 
     with st.container(key="upload"):
         st.html('<h2>Pilih foto daun</h2>')
@@ -131,67 +125,53 @@ def main():
         signature = (mode, tuple((file.file_id, file.name, file.size) for file in files))
         if st.button("Prediksi", type="primary", icon=":material/eco:", width="stretch", disabled=not files or too_many):
             st.session_state.pop("processed", None)
-            try:
-                models = load_models()
-                predictions = {}
-                for file in files:
-                    data = file.getvalue()
-                    try:
-                        read_image(data)
-                        predictions[file.file_id] = predict(data, models)
-                    except ValueError as error:
-                        predictions[file.file_id] = str(error)
-                st.session_state["predictions"] = predictions
-                st.session_state["processed"] = signature
-            except Exception:
-                logging.exception("Model inference failed")
-                st.error("Model tidak dapat dijalankan. Periksa file model dan dependensi aplikasi.")
+            with st.status("Memuat gambar...", expanded=True) as status:
+                try:
+                    model = None
+                    predictions = {}
+                    for file in files:
+                        status.update(label="Memuat gambar...")
+                        data = file.getvalue()
+                        try:
+                            read_image(data)
+                        except ValueError as error:
+                            predictions[file.file_id] = str(error)
+                            continue
+                        status.update(label="Memprediksi gambar...")
+                        if model is None:
+                            model = load_model()
+                        predictions[file.file_id] = predict(data, model)
+                    st.session_state["predictions"] = predictions
+                    st.session_state["processed"] = signature
+                    status.update(label="Prediksi selesai", state="complete", expanded=False)
+                except Exception:
+                    logging.exception("Model inference failed")
+                    status.update(label="Prediksi gagal", state="error", expanded=True)
+                    st.error("Model tidak dapat dijalankan. Periksa file model dan dependensi aplikasi.")
 
     with st.container(key="results"):
         st.html('<h2>Hasil pengenalan</h2>')
         if not files or too_many or st.session_state.get("processed") != signature:
             st.html('<div class="empty"><strong>Hasil akan muncul di sini</strong><p>Pilih foto, lalu tekan tombol Prediksi.</p></div>')
         else:
-            scored = {name: [0, 0] for name in ("LWDN", "DenseNet-121")}
             for file in files:
                 prediction = st.session_state["predictions"][file.file_id]
                 st.subheader(Path(file.name).name)
                 if isinstance(prediction, str):
                     st.error(prediction)
                     continue
-                st.image(read_image(file.getvalue()), width=220)
-                truth = st.selectbox(
-                    "Label asli (opsional)",
-                    ["Belum diisi", *CLASS_NAMES, "Di luar 10 kelas"],
-                    key=f"truth_{file.file_id}",
-                )
-                left, right = st.columns(2)
-                for column, name in ((left, "LWDN"), (right, "DenseNet-121")):
-                    label, confidence, elapsed_ms = prediction[name]
-                    with column:
-                        st.markdown(f"**{name}**")
-                        st.write(label)
-                        st.caption(PLANT_INFO[label]["latin"])
-                        st.caption(f"Keyakinan: {confidence:.1%} · Waktu inferensi: {elapsed_ms:.1f} ms")
-                        with st.expander("Khasiat yang diteliti berdasarkan prediksi"):
-                            for benefit in PLANT_INFO[label]["benefits"]:
-                                st.markdown(f"- {benefit}")
-                    if truth != "Belum diisi":
-                        scored[name][0] += int(label == truth)
-                        scored[name][1] += 1
-                st.caption("Ringkasan penelitian dari tim; bagian tanaman dan tingkat bukti berbeda. Bukan saran medis.")
+                label, confidence, elapsed_ms = prediction
+                image_column, result_column = st.columns([2, 3], gap="large")
+                with image_column:
+                    st.image(read_image(file.getvalue()), width="stretch")
+                with result_column:
+                    st.markdown(f"**Nama daun:** {label}")
+                    st.markdown(f"**Nama latin:** *{PLANT_INFO[label]['latin']}*")
+                    st.markdown("**Khasiat yang diteliti:**")
+                    st.markdown("\n".join(f"- {benefit}" for benefit in PLANT_INFO[label]["benefits"]))
+                    st.caption(f"Keyakinan: {confidence:.1%} · Waktu inferensi: {elapsed_ms:.1f} ms")
+                    st.caption("Ringkasan penelitian dari tim; bagian tanaman dan tingkat bukti berbeda. Bukan saran medis.")
                 st.divider()
-
-            with st.sidebar:
-                st.header("About perbandingan")
-                st.caption("Dari foto berlabel pada unggahan aktif. Label asli diisi oleh pengguna.")
-                for name, (correct, total) in scored.items():
-                    st.subheader(name)
-                    if total:
-                        st.write(f"Benar: {correct / total:.1%} · Salah: {(total - correct) / total:.1%}")
-                        st.caption(f"{correct} benar dari {total} foto berlabel")
-                    else:
-                        st.write("Isi label asli untuk menghitung persentase.")
 
     st.html('<p class="footer">FGD Kelompok 6 · Pengenalan daun tanaman obat</p>')
 

@@ -8,7 +8,7 @@ from unittest.mock import patch
 from PIL import Image
 from streamlit.testing.v1 import AppTest
 
-from app import CLASS_NAMES, MAX_BYTES, PLANT_INFO, load_models, predict, read_image
+from app import CLASS_NAMES, MAX_BYTES, PLANT_INFO, load_model, predict, read_image
 
 
 def image_bytes(image_format="PNG", size=(40, 20), exif=None):
@@ -41,11 +41,10 @@ rejects(image_bytes(size=(5000, 4001)), "20 megapiksel")
 assert set(CLASS_NAMES) == set(PLANT_INFO)
 assert all(info["latin"] and len(info["benefits"]) == 3 for info in PLANT_INFO.values())
 
-models = load_models()
-assert tuple(models) == ("LWDN", "DenseNet-121")
-predictions = predict(image_bytes(), models)
-for label, confidence, elapsed_ms in predictions.values():
-    assert label in CLASS_NAMES and 0 <= confidence <= 1 and elapsed_ms >= 0
+model = load_model()
+assert model.output_shape[-1] == len(CLASS_NAMES)
+label, confidence, elapsed_ms = predict(image_bytes(), model)
+assert label in CLASS_NAMES and 0 <= confidence <= 1 and elapsed_ms >= 0
 
 app = AppTest.from_file(str(Path(__file__).with_name("app.py"))).run(timeout=120)
 assert not app.exception, app.exception
@@ -62,16 +61,14 @@ with patch("streamlit.file_uploader", return_value=photo):
     app = AppTest.from_file(str(Path(__file__).with_name("app.py"))).run(timeout=120)
     app.button[0].click().run(timeout=120)
     assert not app.exception, app.exception
-    assert app.selectbox[0].value == "Belum diisi"
+    assert len(app.selectbox) == 0
+    assert len(app.get("expander")) == 0
+    assert len(app.sidebar.get("markdown")) == 0
+    assert any("Nama daun:" in item.value and label in item.value for item in app.get("markdown"))
+    assert any(PLANT_INFO[label]["latin"] in item.value for item in app.get("markdown"))
+    assert all(any(benefit in item.value for item in app.get("markdown")) for benefit in PLANT_INFO[label]["benefits"])
     assert any("Keyakinan:" in item.value for item in app.caption)
-    assert len(app.get("expander")) == 2
-    assert any(PLANT_INFO[predictions["LWDN"][0]]["benefits"][0] in item.value for item in app.get("markdown"))
-    timing_captions = [item.value for item in app.caption if "Waktu inferensi:" in item.value]
-    app.selectbox[0].set_value(predictions["LWDN"][0]).run(timeout=120)
-    assert not app.exception, app.exception
-    assert [item.value for item in app.caption if "Waktu inferensi:" in item.value] == timing_captions
-    assert any("Benar: 100.0% · Salah: 0.0%" in item.value for item in app.sidebar.get("markdown"))
-    app.selectbox[0].set_value("Di luar 10 kelas").run(timeout=120)
-    assert not app.exception, app.exception
-    assert sum("Benar: 0.0% · Salah: 100.0%" in item.value for item in app.sidebar.get("markdown")) == 2
-print("LULUS: validasi foto, kedua model, prediksi nyata, dan penilaian label di sidebar.")
+    assert any("Waktu inferensi:" in item.value for item in app.caption)
+    assert any("Prediksi selesai" in item.label for item in app.get("status"))
+
+print("LULUS: validasi foto, DenseNet-121, khasiat langsung, dan tampilan tanpa label asli/sidebar.")
