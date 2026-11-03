@@ -1,0 +1,82 @@
+{
+  "Belimbing Wuluh": {
+    "latin": "Averrhoa bilimbi",
+    "benefits": [
+      "Antioksidan: daun dan buah mengandung flavonoid, fenol, tanin, serta triterpenoid yang berkontribusi pada aktivitas antioksidan.",
+      "Antimikroba: ekstraknya dilaporkan menghambat pertumbuhan bakteri Gram positif dan Gram negatif secara in vitro.",
+      "Potensi antidiabetik dan penurun lipid: tinjauan farmakologi melaporkan efek antidiabetik, antihipertensi, hipolipidemik, serta hepatoprotektif."
+    ]
+  },
+  "Jambu Biji": {
+    "latin": "Psidium guajava",
+    "benefits": [
+      "Antidiare: studi pada hewan menunjukkan ekstrak daun mengurangi jumlah dan berat tinja; quercetin dianggap berperan dalam efek ini.",
+      "Antibakteri: tinjauan melaporkan aktivitas antibakteri ekstrak jambu biji dalam 27 studi.",
+      "Antiinflamasi: tinjauan mencatat 10 publikasi mengenai aktivitas antiinflamasi ekstrak daunnya."
+    ]
+  },
+  "Jeruk Nipis": {
+    "latin": "Citrus aurantiifolia",
+    "benefits": [
+      "Antioksidan: flavonoid jeruk membantu menangkal radikal bebas.",
+      "Antimikroba dan antivirus: ekstrak serta minyak esensialnya dilaporkan memiliki aktivitas antimikroba, antivirus, dan antijamur.",
+      "Antiinflamasi dan analgesik: kajian fitokimia melaporkan aktivitas antiinflamasi dan pereda nyeri."
+    ]
+  },
+  "Kemangi": {
+    "latin": "Ocimum africanum",
+    "benefits": [
+      "Antibakteri dan antijamur: minyak esensial kemangi mengandung monoterpen seperti sitral, linalool, dan geraniol yang berpotensi antibakteri serta antijamur.",
+      "Antioksidan: minyak esensial Ocimum, termasuk kemangi Afrika, menunjukkan kemampuan menangkal radikal bebas dan stres oksidatif.",
+      "Antiinflamasi: senyawa triterpenoid seperti asam ursolat dan oleanolat dilaporkan berkontribusi pada efek antiinflamasi."
+    ]
+  },
+  "Lidah Buaya": {
+    "latin": "Aloe vera",
+    "benefits": [
+      "Penyembuhan luka bakar: tinjauan menyebut efek menguntungkan penggunaan topikal pada penyembuhan luka bakar.",
+      "Kulit dan mukosa mulut: penggunaan topikal diteliti untuk psoriasis, lichen planus, kerusakan kulit akibat radiasi, serta luka di mulut.",
+      "Potensi menurunkan gula darah: konsumsi oral gel lidah buaya diteliti dapat menurunkan glukosa darah dan HbA1c pada penderita diabetes, tetapi buktinya masih terbatas."
+    ]
+  },
+  "Nangka": {
+    "latin": "Artocarpus heterophyllus",
+    "benefits": [
+      "Antioksidan dan antiinflamasi: buah, daun, dan bijinya dilaporkan memiliki aktivitas antioksidan serta antiinflamasi.",
+      "Potensi antidiabetik: ekstrak daun dan komponen nangka menunjukkan efek menurunkan hiperglikemia serta memperbaiki profil lipid pada studi praklinis.",
+      "Antibakteri: ekstrak dan fitokimia nangka dilaporkan memiliki aktivitas antibakteri."
+    ]
+  },
+  "Pandan": {
+    "latin": "Pandanus amaryllifolius",
+    "benefits": [
+      "Antioksidan: ekstrak etanol daun pandan wangi menunjukkan aktivitas tinggi pada uji DPPH dan ABTS.",
+      "Antibakteri: ekstrak etanol daun pandan wangi memiliki aktivitas antimikroba.",
+      "Potensi kesehatan mulut: ekstrak etanolnya menghambat Porphyromonas gingivalis dan mendukung migrasi fibroblas pada konsentrasi non-toksik dalam studi laboratorium."
+    ]
+  },
+  "Pepaya": {
+    "latin": "Carica papaya",
+    "benefits": [
+      "Pencernaan protein: buah pepaya, terutama yang belum matang, mengandung papain dan kimopapain, enzim yang memecah protein menjadi peptida dan asam amino.",
+      "Antiinflamasi dan antioksidan: ekstrak buah menunjukkan aktivitas terhadap radikal bebas dan spesies oksigen reaktif serta efek antiinflamasi dalam penelitian praklinis.",
+      "Penyembuhan luka: aplikasi topikal ekstrak buah meningkatkan penyembuhan luka pada model hewan melalui regulasi inflamasi dan enzim antioksidan."
+    ]
+  },
+  "Seledri": {
+    "latin": "Apium graveolens",
+    "benefits": [
+      "Tekanan darah: meta-analisis menemukan preparat seledri menurunkan tekanan darah sistolik dan diastolik secara signifikan.",
+      "Antiinflamasi: fitokimia seledri dilaporkan menurunkan aktivitas sitokin proinflamasi dan inflamasi kardiovaskular.",
+      "Potensi metabolik: meta-analisis juga melaporkan perbaikan glukosa darah puasa dan trigliserida."
+    ]
+  },
+  "Sirih": {
+    "latin": "Piper betle",
+    "benefits": [
+      "Antimikroba: tinjauan mengategorikan sirih sebagai tanaman dengan aktivitas antimikroba.",
+      "Kesehatan mulut dan gigi: ekstrak sirih dilaporkan mencegah pembentukan dan mengganggu biofilm bakteri kariogenik dalam studi laboratorium.",
+      "Potensi gastroprotektif dan hepatoprotektif: kajian menyebut potensi perlindungan lambung dan hati, selain efek analgesik."
+    ]
+  }
+}

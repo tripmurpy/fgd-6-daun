@@ -1,0 +1,477 @@
+=== CELL 5 ===
+TensorFlow: 2.21.0
+GPU       : tidak ada (berjalan di CPU)
+
+
+=== CELL 6 ===
+Downloading...
+From (original): https://drive.google.com/uc?id=1jieheQOYqDga1FhBKQgs6tcwVX02uWQr
+From (redirected): https://drive.google.com/uc?id=1jieheQOYqDga1FhBKQgs6tcwVX02uWQr&confirm=t&uuid=ff608371-b678-4d59-a0d8-20bb311c87c8
+To: /content/work/dataset.zip
+100%|██████████| 394M/394M [00:06<00:00, 60.4MB/s]
+
+Ukuran file: 393,505,457 | harapan: 393,505,457
+DATA_ROOT: /content/work/raw/Indonesian Herb Leaf Dataset 3500
+DATA_ROOT   : /content/work/raw/Indonesian Herb Leaf Dataset 3500
+Total citra : 3500 | Kelas: 10 -> ['Belimbing Wuluh', 'Jambu Biji', 'Jeruk Nipis', 'Kemangi', 'Lidah Buaya', 'Nangka', 'Pandan', 'Pepaya', 'Seledri', 'Sirih']
+
+
+=== CELL 9 ===
+label         Belimbing Wuluh  Jambu Biji  Jeruk Nipis  Kemangi  Lidah Buaya  \
+jumlah_citra              350         350          350      350          350   
+
+label         Nangka  Pandan  Pepaya  Seledri  Sirih  
+jumlah_citra     350     350     350      350    350  
+
+=== CELL 11 ===
+<Figure size 1000x420 with 1 Axes>
+Rasio kelas terbanyak/tersedikit = 1.00 -> seimbang
+
+
+=== CELL 13 ===
+<Figure size 1200x1620 with 50 Axes>
+
+=== CELL 14 ===
+Citra korup/tidak terbaca : 0
+Format                    : {'JPEG': 3500}
+Mode warna                : {'RGB': 3500}
+Resolusi (w x h)          : {(1600, 1200): 3500}
+Orientasi EXIF != 1       : 0 citra
+Ukuran file               : rata-rata 132 KB | min 36 KB | maks 524 KB
+
+
+=== CELL 16 ===
+<Figure size 1600x450 with 3 Axes>
+                 brightness  sharpness  leaf_ratio
+label                                             
+Belimbing Wuluh      223.71     261.82        0.17
+Jambu Biji           215.27     250.21        0.27
+Jeruk Nipis          222.92     138.82        0.20
+Kemangi              237.02     153.22        0.11
+Lidah Buaya          233.81     167.47        0.14
+Nangka               209.51     255.89        0.25
+Pandan               234.93     142.86        0.12
+Pepaya               217.36     789.02        0.21
+Seledri              229.76     215.69        0.15
+Sirih                208.09     185.82        0.29
+
+=== CELL 19 ===
+                                    jumlah status
+Label kosong                             0   aman
+File tidak ditemukan / path kosong       0   aman
+File 0 byte                              0   aman
+File sangat kecil (< 5 KB)               0   aman
+Metadata gagal dibaca (NaN)              0   aman
+Mode warna bukan RGB                     0   aman
+File non-gambar di folder kelas          0   aman
+Folder kelas kosong                      0   aman
+Setelah missing/corrupt/duplikat: 3422 citra
+Downloading data from https://storage.googleapis.com/tensorflow/keras-applications/densenet/densenet121_weights_tf_dim_ordering_tf_kernels_notop.h5
+[1m29084464/29084464[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m0s[0m 0us/step
+
+Akurasi prediksi cross-val : 0.9883
+Kandidat salah label       : 8 dari 3422
+
+             kandidat
+label                
+Jambu Biji          1
+Jeruk Nipis         2
+Lidah Buaya         2
+Nangka              1
+Pepaya              1
+Seledri             1
+<Figure size 1500x640 with 10 Axes>
+                                 key       pred_label  p_pred  p_own
+1912            Nangka/Nangka193.jpg            Sirih   1.000  0.000
+856   Jeruk Nipis/Jeruk Nipis161.jpg  Belimbing Wuluh   0.999  0.001
+553     Jambu Biji/Jambu biji208.jpg          Kemangi   0.966  0.005
+1457  Lidah Buaya/Lidah Buaya086.jpg           Pandan   0.992  0.008
+2834          Seledri/Seledri104.jpg          Kemangi   0.989  0.011
+2420            Pepaya/Pepaya005.jpg          Seledri   0.964  0.036
+923   Jeruk Nipis/Jeruk Nipis228.jpg  Belimbing Wuluh   0.957  0.043
+1445  Lidah Buaya/Lidah Buaya074.jpg           Pandan   0.937  0.063
+                                          tahap  jumlah
+0                                     Data awal    3500
+1                     1A. Missing value dibuang       0
+2                     1B. Rusak/corrupt dibuang       0
+3                  1C. Duplikat konflik dibuang       0
+4                    1C. Duplikat biasa dibuang      78
+5            1D. Salah label dibuang (otomatis)       0
+6  1D. Salah label dibuang (manual, DROP_FILES)       0
+7                        DATA SETELAH CLEANSING    3422
+label                     Belimbing Wuluh  Jambu Biji  Jeruk Nipis  Kemangi  \
+jumlah_setelah_cleansing              349         347          326      350   
+
+label                     Lidah Buaya  Nangka  Pandan  Pepaya  Seledri  Sirih  
+jumlah_setelah_cleansing          350     345     349     316      349    341  
+
+=== CELL 21 ===
+X_ae: (3422, 128, 128, 3) uint8
+Epoch 1/40
+97/97 - 178s - 2s/step - loss: 0.0498 - val_loss: 0.0662 - learning_rate: 0.0010
+Epoch 2/40
+97/97 - 182s - 2s/step - loss: 0.0183 - val_loss: 0.0685 - learning_rate: 0.0010
+Epoch 3/40
+97/97 - 175s - 2s/step - loss: 0.0134 - val_loss: 0.0454 - learning_rate: 0.0010
+Epoch 4/40
+97/97 - 174s - 2s/step - loss: 0.0101 - val_loss: 0.0197 - learning_rate: 0.0010
+Epoch 5/40
+97/97 - 175s - 2s/step - loss: 0.0090 - val_loss: 0.0221 - learning_rate: 0.0010
+Epoch 6/40
+97/97 - 177s - 2s/step - loss: 0.0111 - val_loss: 0.4913 - learning_rate: 0.0010
+Epoch 7/40
+97/97 - 171s - 2s/step - loss: 0.0077 - val_loss: 0.1056 - learning_rate: 0.0010
+Epoch 8/40
+97/97 - 173s - 2s/step - loss: 0.0066 - val_loss: 0.0234 - learning_rate: 5.0000e-04
+Epoch 9/40
+97/97 - 169s - 2s/step - loss: 0.0062 - val_loss: 0.0074 - learning_rate: 5.0000e-04
+Epoch 10/40
+97/97 - 201s - 2s/step - loss: 0.0057 - val_loss: 0.0056 - learning_rate: 5.0000e-04
+Epoch 11/40
+97/97 - 173s - 2s/step - loss: 0.0055 - val_loss: 0.0053 - learning_rate: 5.0000e-04
+Epoch 12/40
+97/97 - 173s - 2s/step - loss: 0.0052 - val_loss: 0.0058 - learning_rate: 5.0000e-04
+Epoch 13/40
+97/97 - 202s - 2s/step - loss: 0.0050 - val_loss: 0.0051 - learning_rate: 5.0000e-04
+Epoch 14/40
+97/97 - 200s - 2s/step - loss: 0.0051 - val_loss: 0.0054 - learning_rate: 5.0000e-04
+Epoch 15/40
+97/97 - 168s - 2s/step - loss: 0.0048 - val_loss: 0.0049 - learning_rate: 5.0000e-04
+Epoch 16/40
+97/97 - 203s - 2s/step - loss: 0.0048 - val_loss: 0.0135 - learning_rate: 5.0000e-04
+Epoch 17/40
+97/97 - 202s - 2s/step - loss: 0.0078 - val_loss: 0.0132 - learning_rate: 5.0000e-04
+Epoch 18/40
+97/97 - 168s - 2s/step - loss: 0.0051 - val_loss: 0.0053 - learning_rate: 5.0000e-04
+Epoch 19/40
+97/97 - 170s - 2s/step - loss: 0.0046 - val_loss: 0.0058 - learning_rate: 2.5000e-04
+Epoch 20/40
+97/97 - 170s - 2s/step - loss: 0.0044 - val_loss: 0.0053 - learning_rate: 2.5000e-04
+Epoch 21/40
+97/97 - 203s - 2s/step - loss: 0.0043 - val_loss: 0.0044 - learning_rate: 2.5000e-04
+Epoch 22/40
+97/97 - 171s - 2s/step - loss: 0.0042 - val_loss: 0.0044 - learning_rate: 2.5000e-04
+Epoch 23/40
+97/97 - 172s - 2s/step - loss: 0.0042 - val_loss: 0.0042 - learning_rate: 2.5000e-04
+Epoch 24/40
+97/97 - 166s - 2s/step - loss: 0.0040 - val_loss: 0.0046 - learning_rate: 2.5000e-04
+Epoch 25/40
+97/97 - 202s - 2s/step - loss: 0.0040 - val_loss: 0.0043 - learning_rate: 2.5000e-04
+Epoch 26/40
+97/97 - 207s - 2s/step - loss: 0.0039 - val_loss: 0.0047 - learning_rate: 2.5000e-04
+Epoch 27/40
+97/97 - 197s - 2s/step - loss: 0.0038 - val_loss: 0.0042 - learning_rate: 1.2500e-04
+Epoch 28/40
+97/97 - 165s - 2s/step - loss: 0.0037 - val_loss: 0.0044 - learning_rate: 1.2500e-04
+Epoch 29/40
+97/97 - 202s - 2s/step - loss: 0.0036 - val_loss: 0.0044 - learning_rate: 1.2500e-04
+
+<Figure size 600x350 with 1 Axes>
+<Figure size 1400x500 with 12 Axes>
+
+=== CELL 23 ===
+Anomali autoencoder: 103 dari 3422 (3.0%)
+
+label       Belimbing Wuluh  Jambu Biji  Jeruk Nipis  Kemangi  Lidah Buaya  \
+anomali_AE               11           5            2        5           29   
+
+label       Nangka  Pandan  Pepaya  Seledri  Sirih  
+anomali_AE      12      13       0        8     18  
+<Figure size 1000x400 with 1 Axes>
+
+=== CELL 24 ===
+<Figure size 1500x1280 with 20 Axes>
+
+=== CELL 25 ===
+                                 key  ae_error     ae_z
+1702  Lidah Buaya/Lidah buaya331.jpg    0.0199  23.0951
+1755            Nangka/Nangka034.jpg    0.0293  21.2553
+1691  Lidah Buaya/Lidah buaya320.jpg    0.0157  17.8526
+3267              Sirih/Sirih193.jpg    0.0224  16.0478
+3280              Sirih/Sirih208.jpg    0.0223  15.9538
+...                              ...       ...      ...
+1715  Lidah Buaya/Lidah buaya344.jpg    0.0044   3.5415
+1804            Nangka/Nangka084.jpg    0.0072   3.5216
+2372            Pandan/Pandan307.jpg    0.0040   3.5183
+1432  Lidah Buaya/Lidah Buaya061.jpg    0.0044   3.5080
+2758          Seledri/Seledri027.jpg    0.0111   3.5078
+
+[103 rows x 3 columns]
+
+=== CELL 26 ===
+Nama di DROP_ANOMALI_FILES/KEEP_ANOMALI_FILES yang tidak ditemukan: [] (harus [])
+
+                            tahap  jumlah
+0  Data setelah cleansing (SEL 1)    3422
+1    Anomali ditandai autoencoder     103
+2      Anomali dibuang (otomatis)       0
+3        Anomali dibuang (manual)       0
+4               DATA BERSIH AKHIR    3422
+label         Belimbing Wuluh  Jambu Biji  Jeruk Nipis  Kemangi  Lidah Buaya  \
+jumlah_akhir              349         347          326      350          350   
+
+label         Nangka  Pandan  Pepaya  Seledri  Sirih  
+jumlah_akhir     345     349     316      349    341  
+
+=== CELL 28 ===
+split            train  val  test  total
+label                                   
+Belimbing Wuluh    279   35    35    349
+Jambu Biji         277   35    35    347
+Jeruk Nipis        261   32    33    326
+Kemangi            280   35    35    350
+Lidah Buaya        280   35    35    350
+Nangka             276   34    35    345
+Pandan             279   35    35    349
+Pepaya             253   32    31    316
+Seledri            279   35    35    349
+Sirih              273   34    34    341
+TOTAL             2737  342   343   3422
+train: 2737 citra
+val  : 342 citra
+test : 343 citra
+
+
+=== CELL 29 ===
+<Figure size 1400x600 with 10 Axes>
+
+=== CELL 31 ===
+split           train
+is_aug           True
+label                
+Belimbing Wuluh   121
+Jambu Biji        123
+Jeruk Nipis       139
+Kemangi           120
+Lidah Buaya       120
+Nangka            124
+Pandan            121
+Pepaya            147
+Seledri           121
+Sirih             127
+label                     Belimbing Wuluh  Jambu Biji  Jeruk Nipis  Kemangi  \
+train_setelah_augmentasi              400         400          400      400   
+
+label                     Lidah Buaya  Nangka  Pandan  Pepaya  Seledri  Sirih  
+train_setelah_augmentasi          400     400     400     400      400    400  
+
+
+=== CELL 32 ===
+<Figure size 1200x2000 with 60 Axes>
+
+=== CELL 34 ===
+Found 4000 files belonging to 10 classes.
+Found 342 files belonging to 10 classes.
+Found 343 files belonging to 10 classes.
+
+
+=== CELL 36 ===
+<pandas.io.formats.style.Styler at 0x7f35de1896a0>
+
+=== CELL 37 ===
+<pandas.io.formats.style.Styler at 0x7f360de4d810>
+
+=== CELL 40 ===
+Mounted at /content/drive
+
+
+=== CELL 42 ===
+Handoff dipulihkan: /content/drive/MyDrive/FGD6/handoff/20261028T104133_556236Z.zip
+Jalankan sel TRANSFORMASI Phase 3, lalu lanjutkan ke Data pipeline dan handoff.
+
+
+=== CELL 44 ===
+Jumlah kelas: 10
+Nama kelas: Belimbing Wuluh, Jambu Biji, Jeruk Nipis, Kemangi, Lidah Buaya, Nangka, Pandan, Pepaya, Seledri, Sirih
+Data train: 4000 gambar
+Data validation: 342 gambar
+Ukuran input: 224 x 224 RGB | batch: 32
+
+
+=== CELL 46 ===
+Konfigurasi berhasil disimpan | CPU | float32
+Folder eksperimen: /content/drive/MyDrive/FGD6/runs/DenseNet121/20261028T104136_712764Z
+
+
+=== CELL 48 ===
+[1mModel: "herbal_densenet121"[0m
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃[1m [0m[1mLayer (type)                   [0m[1m [0m┃[1m [0m[1mOutput Shape          [0m[1m [0m┃[1m [0m[1m      Param #[0m[1m [0m┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ input_layer_4 ([38;5;33mInputLayer[0m)      │ ([38;5;45mNone[0m, [38;5;34m224[0m, [38;5;34m224[0m, [38;5;34m3[0m)    │             [38;5;34m0[0m │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ densenet121 ([38;5;33mFunctional[0m)        │ ([38;5;45mNone[0m, [38;5;34m7[0m, [38;5;34m7[0m, [38;5;34m1024[0m)     │     [38;5;34m7,037,504[0m │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ global_average_pooling2d        │ ([38;5;45mNone[0m, [38;5;34m1024[0m)           │             [38;5;34m0[0m │
+│ ([38;5;33mGlobalAveragePooling2D[0m)        │                        │               │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dropout ([38;5;33mDropout[0m)               │ ([38;5;45mNone[0m, [38;5;34m1024[0m)           │             [38;5;34m0[0m │
+├─────────────────────────────────┼────────────────────────┼───────────────┤
+│ dense_1 ([38;5;33mDense[0m)                 │ ([38;5;45mNone[0m, [38;5;34m10[0m)             │        [38;5;34m10,250[0m │
+└─────────────────────────────────┴────────────────────────┴───────────────┘
+
+[1m Total params: [0m[38;5;34m7,047,754[0m (26.89 MB)
+
+[1m Trainable params: [0m[38;5;34m10,250[0m (40.04 KB)
+
+[1m Non-trainable params: [0m[38;5;34m7,037,504[0m (26.85 MB)
+
+
+=== CELL 50 ===
+Epoch 1/10
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m457s[0m 4s/step - accuracy: 0.5650 - loss: 1.3508 - val_accuracy: 0.8830 - val_loss: 0.5416
+Epoch 2/10
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m443s[0m 4s/step - accuracy: 0.8250 - loss: 0.6317 - val_accuracy: 0.9211 - val_loss: 0.3300
+Epoch 3/10
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m437s[0m 3s/step - accuracy: 0.8662 - loss: 0.4745 - val_accuracy: 0.9561 - val_loss: 0.2539
+Epoch 4/10
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m441s[0m 4s/step - accuracy: 0.8860 - loss: 0.4110 - val_accuracy: 0.9415 - val_loss: 0.2321
+Epoch 5/10
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m441s[0m 4s/step - accuracy: 0.8942 - loss: 0.3567 - val_accuracy: 0.9591 - val_loss: 0.1938
+Epoch 6/10
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m442s[0m 4s/step - accuracy: 0.8970 - loss: 0.3330 - val_accuracy: 0.9561 - val_loss: 0.1770
+Epoch 7/10
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m431s[0m 3s/step - accuracy: 0.9068 - loss: 0.3065 - val_accuracy: 0.9561 - val_loss: 0.1679
+Epoch 8/10
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m432s[0m 3s/step - accuracy: 0.9105 - loss: 0.3061 - val_accuracy: 0.9620 - val_loss: 0.1606
+Epoch 9/10
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m441s[0m 3s/step - accuracy: 0.9093 - loss: 0.2791 - val_accuracy: 0.9532 - val_loss: 0.1706
+Epoch 10/10
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m442s[0m 4s/step - accuracy: 0.9115 - loss: 0.2941 - val_accuracy: 0.9532 - val_loss: 0.1602
+Warm-up selesai: 10 epoch, 4407.3 detik
+
+
+=== CELL 52 ===
+Parameter fine-tuning: 2140170
+
+
+=== CELL 54 ===
+Epoch 1/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m499s[0m 4s/step - accuracy: 0.9185 - loss: 0.2508 - val_accuracy: 0.9620 - val_loss: 0.1260
+Epoch 2/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m485s[0m 4s/step - accuracy: 0.9355 - loss: 0.2035 - val_accuracy: 0.9591 - val_loss: 0.1183
+Epoch 3/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m490s[0m 4s/step - accuracy: 0.9373 - loss: 0.1893 - val_accuracy: 0.9561 - val_loss: 0.1132
+Epoch 4/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m469s[0m 4s/step - accuracy: 0.9435 - loss: 0.1790 - val_accuracy: 0.9620 - val_loss: 0.1143
+Epoch 5/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m468s[0m 4s/step - accuracy: 0.9480 - loss: 0.1630 - val_accuracy: 0.9708 - val_loss: 0.1042
+Epoch 6/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m502s[0m 4s/step - accuracy: 0.9440 - loss: 0.1644 - val_accuracy: 0.9678 - val_loss: 0.1028
+Epoch 7/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m472s[0m 4s/step - accuracy: 0.9513 - loss: 0.1471 - val_accuracy: 0.9678 - val_loss: 0.0973
+Epoch 8/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m470s[0m 4s/step - accuracy: 0.9498 - loss: 0.1493 - val_accuracy: 0.9678 - val_loss: 0.1063
+Epoch 9/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m480s[0m 4s/step - accuracy: 0.9588 - loss: 0.1243 - val_accuracy: 0.9678 - val_loss: 0.0965
+Epoch 10/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m474s[0m 4s/step - accuracy: 0.9528 - loss: 0.1341 - val_accuracy: 0.9649 - val_loss: 0.0963
+Epoch 11/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m472s[0m 4s/step - accuracy: 0.9613 - loss: 0.1242 - val_accuracy: 0.9708 - val_loss: 0.0894
+Epoch 12/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m500s[0m 4s/step - accuracy: 0.9588 - loss: 0.1173 - val_accuracy: 0.9678 - val_loss: 0.0914
+Epoch 13/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m485s[0m 4s/step - accuracy: 0.9635 - loss: 0.1112 - val_accuracy: 0.9737 - val_loss: 0.0815
+Epoch 14/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m485s[0m 4s/step - accuracy: 0.9638 - loss: 0.1119 - val_accuracy: 0.9737 - val_loss: 0.0835
+Epoch 15/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m470s[0m 4s/step - accuracy: 0.9680 - loss: 0.0975 - val_accuracy: 0.9678 - val_loss: 0.0775
+Epoch 16/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m480s[0m 4s/step - accuracy: 0.9610 - loss: 0.1149 - val_accuracy: 0.9737 - val_loss: 0.0759
+Epoch 17/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m471s[0m 4s/step - accuracy: 0.9672 - loss: 0.0999 - val_accuracy: 0.9708 - val_loss: 0.0821
+Epoch 18/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m509s[0m 4s/step - accuracy: 0.9663 - loss: 0.0964 - val_accuracy: 0.9708 - val_loss: 0.0821
+Epoch 19/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m471s[0m 4s/step - accuracy: 0.9725 - loss: 0.0886 - val_accuracy: 0.9708 - val_loss: 0.0741
+Epoch 20/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m480s[0m 4s/step - accuracy: 0.9700 - loss: 0.0908 - val_accuracy: 0.9737 - val_loss: 0.0757
+Epoch 21/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m480s[0m 4s/step - accuracy: 0.9730 - loss: 0.0839 - val_accuracy: 0.9737 - val_loss: 0.0736
+Epoch 22/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m474s[0m 4s/step - accuracy: 0.9743 - loss: 0.0774 - val_accuracy: 0.9737 - val_loss: 0.0717
+Epoch 23/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m475s[0m 4s/step - accuracy: 0.9730 - loss: 0.0845 - val_accuracy: 0.9766 - val_loss: 0.0732
+Epoch 24/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m472s[0m 4s/step - accuracy: 0.9770 - loss: 0.0718 - val_accuracy: 0.9737 - val_loss: 0.0690
+Epoch 25/25
+[1m125/125[0m [32m━━━━━━━━━━━━━━━━━━━━[0m[37m[0m [1m475s[0m 4s/step - accuracy: 0.9780 - loss: 0.0738 - val_accuracy: 0.9708 - val_loss: 0.0687
+Fine-tuning selesai: 25 epoch, 12011.1 detik
+
+
+=== CELL 56 ===
+Checkpoint terpilih: fine-tuning | epoch 25 | val_loss 0.0687
+Model berhasil dimuat ulang: /content/drive/MyDrive/FGD6/runs/DenseNet121/20261028T104136_712764Z/finetune_best.keras
+
+
+=== CELL 58 ===
+Checkpoint terpilih dimuat: /content/drive/MyDrive/FGD6/runs/DenseNet121/20261028T104136_712764Z/finetune_best.keras
+DenseNet-121 siap untuk langkah LWDN; tidak perlu menjalankan ulang training DenseNet.
+
+
+=== CELL 61 ===
+Handoff LWDN: 4000 train | 342 validation | 10 kelas
+Input: 224 × 224 RGB | batch 32 | preprocessing DenseNet
+
+
+=== CELL 63 ===
+Run LWDN dipulihkan: /content/drive/MyDrive/FGD6/runs/LWDN/20261028T151525_228962Z
+Checkpoint: finetune | epoch 8 | val_accuracy 62.28%
+Warm-up tidak perlu diulang. Jalankan pemeriksaan di bawah, lalu L06; L02-L05 akan dilewati.
+Jika backup kelanjutan tersedia, L06 memulihkan epoch terakhir otomatis.
+
+
+=== CELL 65 ===
+Pemulihan LWDN LULUS | validation accuracy 62.28% | loss 1.0660
+Kelanjutan dari epoch tersimpan 8; batas akhir tetap 25 epoch.
+
+
+=== CELL 67 ===
+Memakai run LWDN yang dipulihkan: /content/drive/MyDrive/FGD6/runs/LWDN/20261028T151525_228962Z
+
+
+=== CELL 69 ===
+L03 dilewati: model LWDN sudah dimuat dari checkpoint.
+
+
+=== CELL 71 ===
+L04 dilewati: warm-up tersimpan dan tidak diulang.
+
+
+=== CELL 73 ===
+L05 dilewati: bobot dan optimizer fine-tuning sudah dipulihkan.
+
+
+=== CELL 75 ===
+NameErrorname 'lwdn_model' is not defined
+
+=== CELL 76 ===
+Epoch 11/25
+
+KeyboardInterrupt
+
+=== CELL 85 ===
+❌ Google Drive belum terpasang. Sila jalankan sel 'drive.mount' terlebih dahulu.
+
+
+=== CELL 86 ===
+Mounted at /content/drive
+✅ Google Drive berhasil terpasang!
+
+
+=== CELL 87 ===
+✅ Folder FGD6 ditemukan di: /content/drive/MyDrive/FGD6
+
+Daftar berkas di dalam folder handoff:
+  - 20261028T104124_692288Z.zip (31.52 MB)
+  - 20261028T104133_556236Z.zip (31.52 MB)
+
+Daftar eksperimen di dalam folder runs:
+  - runs/
+    - DenseNet121/
+      - 20261028T104136_712764Z/
+    - LWDN/
+      - 20261028T151525_228962Z/
+        - finetune_resume_backup/
+      - 20261028T223119_199177Z/

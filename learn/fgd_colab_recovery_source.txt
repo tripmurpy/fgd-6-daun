@@ -1,0 +1,470 @@
+Snapshot source cells dari FGD-6 di Google Drive; dibaca 31 Oktober 2026. Isi ini untuk analisis; sumber dapat berubah.
+
+===== Cell 34 | e7xe5KJi0Xdf =====
+from tensorflow.keras.applications import densenet
+AUTOTUNE = tf.data.AUTOTUNE # mengatur paralelisme otomatis
+
+def load_base(split):
+    ds = tf.keras.utils.image_dataset_from_directory(
+        PREP_DIR / split, labels="inferred", label_mode="categorical",
+        class_names=CLASS_NAMES, image_size=(IMG_SIZE, IMG_SIZE),
+        batch_size=None, shuffle=False)
+    ds = ds.map(lambda x, y: (tf.cast(x, tf.uint8), y), num_parallel_calls=AUTOTUNE)
+    return ds.cache(), len(ds)
+
+BASE, N_IMAGES = {}, {}
+for s in ["train", "val", "test"]:
+    BASE[s], N_IMAGES[s] = load_base(s)
+
+def make_dataset(split, preprocess_fn, training=False):
+    ds = BASE[split]
+    if training:
+        ds = ds.shuffle(N_IMAGES[split], seed=SEED, reshuffle_each_iteration=True)
+    ds = ds.batch(BATCH)
+    ds = ds.map(lambda x, y: (tf.cast(x, tf.float32), y), num_parallel_calls=AUTOTUNE)
+    if training:
+        ds = ds.map(lambda x, y: (augmenter(x, training=True), y), num_parallel_calls=AUTOTUNE)
+    ds = ds.map(lambda x, y: (preprocess_fn(x), y), num_parallel_calls=AUTOTUNE)
+    return ds.prefetch(AUTOTUNE)
+
+# Normalisasi
+PREPROCESS = {
+    "DenseNet121"         : densenet.preprocess_input, # model acuan
+    "Lightweight_DenseNet": lambda x: x,               # model pembanding
+}
+datasets = {name: {"train": make_dataset("train", fn, training=True),
+                   "val"  : make_dataset("val", fn),
+                   "test" : make_dataset("test", fn)}
+            for name, fn in PREPROCESS.items()}
+
+y_train = train_df["label"].map({c: i for i, c in enumerate(CLASS_NAMES)}).values
+cw = compute_class_weight("balanced", classes=np.arange(len(CLASS_NAMES)), y=y_train)
+CLASS_WEIGHT = {i: float(w) for i, w in enumerate(cw)}
+
+===== Cell 42 | K0p5Y4vnJ-dW =====
+# Simpan handoff setelah QC lulus, atau pulihkan setelah runtime reset.
+from pathlib import Path, PurePosixPath
+from datetime import datetime, timezone
+import io, json, os, random, shutil, tempfile, zipfile
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from sklearn.utils.class_weight import compute_class_weight
+
+assert os.path.ismount('/content/drive'), 'Jalankan sel Google Drive terlebih dahulu.'
+HANDOFF_ACTION = 'restore'  # Ubah menjadi 'restore' setelah runtime reset.
+handoff_dir = Path('/content/drive/MyDrive/FGD6/handoff')
+
+if HANDOFF_ACTION == 'save':
+    assert 'checks' in globals() and checks and all(row[1] for row in checks), 'QC Phase 3 harus lulus.'
+    assert PREP_DIR.is_dir() and len(df_final) == sum(N_IMAGES.values())
+    expected = {Path(p).resolve() for p in df_final['prep_path']}
+    actual = {p.resolve() for p in PREP_DIR.rglob('*.jpg')}
+    assert len(expected) == len(df_final) and expected == actual, 'File handoff tidak cocok dengan tabel.'
+    for p in expected:
+        p.relative_to(PREP_DIR.resolve())
+    handoff_dir.mkdir(parents=True, exist_ok=True)
+    handoff_final = handoff_dir / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S_%fZ') + '.zip')
+    handoff_path = handoff_final.with_suffix('.partial')
+    metadata = {
+        'classes': list(CLASS_NAMES), 'image_size': IMG_SIZE, 'batch': BATCH,
+        'seed': SEED, 'dataset_file_id': FILE_ID, 'split': list(SPLIT),
+        'counts': {s: int(N_IMAGES[s]) for s in ('train', 'val', 'test')},
+        'checks': [list(row) for row in checks], 'augmenter': augmenter.to_json(),
+    }
+    with zipfile.ZipFile(handoff_path, 'x', compression=zipfile.ZIP_STORED) as archive:
+        archive.writestr('metadata.json', json.dumps(metadata, ensure_ascii=False))
+        archive.writestr('df_final.csv', df_final.to_csv(index=False))
+        archive.writestr('train_df.csv', train_df.to_csv(index=False))
+        for image_path in sorted(expected):
+            archive.write(image_path, 'images/' + image_path.relative_to(PREP_DIR.resolve()).as_posix())
+    with zipfile.ZipFile(handoff_path) as archive:
+        assert archive.testzip() is None, 'Arsip handoff gagal diperiksa.'
+    handoff_path.rename(handoff_final)
+    handoff_path = handoff_final
+    print('Handoff disimpan:', handoff_path)
+
+elif HANDOFF_ACTION == 'restore':
+    handoff_files = sorted(handoff_dir.glob('*.zip'))
+    assert handoff_files, 'Handoff belum tersedia di Drive; simpan setelah Phase 3 selesai.'
+    handoff_path = handoff_files[-1]
+    WORK_DIR = Path('/content/work')
+    PREP_DIR = WORK_DIR / 'dataset_224'
+    assert not PREP_DIR.exists(), 'Folder dataset sudah ada; jangan timpa. Gunakan runtime kosong.'
+    with zipfile.ZipFile(handoff_path) as archive:
+        assert archive.testzip() is None, 'Arsip handoff rusak.'
+        metadata = json.loads(archive.read('metadata.json'))
+        df_final = pd.read_csv(io.BytesIO(archive.read('df_final.csv')))
+        train_df = pd.read_csv(io.BytesIO(archive.read('train_df.csv')))
+        image_names = [n for n in archive.namelist() if n.startswith('images/') and not n.endswith('/')]
+        assert len(image_names) == len(df_final) == sum(metadata['counts'].values())
+        assert len(image_names) == len(set(image_names))
+        for name in image_names:
+            path = PurePosixPath(name)
+            assert len(path.parts) >= 4 and path.parts[0] == 'images' and '..' not in path.parts
+        WORK_DIR.mkdir(parents=True, exist_ok=True)
+        stage_dir = Path(tempfile.mkdtemp(prefix='handoff-', dir=WORK_DIR))
+        try:
+            for name in image_names:
+                dest = stage_dir.joinpath(*PurePosixPath(name).parts[1:])
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(name) as src, dest.open('xb') as target:
+                    shutil.copyfileobj(src, target)
+            assert all(len(list((stage_dir / s).rglob('*.jpg'))) == metadata['counts'][s] for s in ('train', 'val', 'test'))
+            stage_dir.rename(PREP_DIR)
+        finally:
+            if stage_dir.exists():
+                shutil.rmtree(stage_dir)
+    CLASS_NAMES = metadata['classes']
+    IMG_SIZE, BATCH, SEED = metadata['image_size'], metadata['batch'], metadata['seed']
+    FILE_ID, SPLIT = metadata['dataset_file_id'], tuple(metadata['split'])
+    checks = metadata['checks']
+    assert checks and all(row[1] for row in checks) and len(CLASS_NAMES) == 10
+    assert all((PREP_DIR / s / cls).is_dir() for s in ('train', 'val', 'test') for cls in CLASS_NAMES)
+    assert all(len(list((PREP_DIR / s).rglob('*.jpg'))) == metadata['counts'][s] for s in ('train', 'val', 'test'))
+    random.seed(SEED); np.random.seed(SEED); tf.random.set_seed(SEED)
+    augmenter = tf.keras.models.model_from_json(metadata['augmenter'])
+    print('Handoff dipulihkan:', handoff_path)
+    print('Jalankan sel TRANSFORMASI Phase 3, lalu lanjutkan ke Data pipeline dan handoff.')
+else:
+    raise ValueError("HANDOFF_ACTION harus 'save' atau 'restore'.")
+
+
+===== Cell 44 | 3HknRbVgJDqj =====
+# Menggunakan data Phase 3 yang sudah diproses tanpa mengulang preprocessing.
+train_dataset = datasets["DenseNet121"]["train"]
+val_dataset = datasets["DenseNet121"]["val"]
+
+# Menampilkan ringkasan data yang akan diterima model.
+print("Jumlah kelas:", len(CLASS_NAMES))
+print("Nama kelas:", ", ".join(CLASS_NAMES))
+print(f"Data train: {N_IMAGES['train']} gambar")
+print(f"Data validation: {N_IMAGES['val']} gambar")
+print(f"Ukuran input: {IMG_SIZE} x {IMG_SIZE} RGB | batch: {BATCH}")
+
+===== Cell 58 | dop6y8FwMXVc =====
+# Memuat kembali run DenseNet-121 tanpa mengubah file run.
+from pathlib import Path
+import json
+import tensorflow as tf
+
+RECOVER_DENSENET_RUN = '20261028T104136_712764Z'  # Isi dengan nama folder run yang ditampilkan.
+recovery_root = Path('/content/drive/MyDrive/FGD6/runs/DenseNet121')
+available_runs = sorted(p for p in recovery_root.iterdir() if p.is_dir() and (p / 'config.json').is_file()) if recovery_root.is_dir() else []
+if not RECOVER_DENSENET_RUN:
+    print('Run tersedia:')
+    for available_run in available_runs:
+        print('-', available_run.name)
+    if not available_runs:
+        print('Belum ada run DenseNet-121 di Drive.')
+    print('Isi RECOVER_DENSENET_RUN dengan nama folder yang dipilih, lalu jalankan kembali.')
+else:
+    assert Path(RECOVER_DENSENET_RUN).name == RECOVER_DENSENET_RUN, 'Isi hanya nama folder run.'
+    recovery_run = recovery_root / RECOVER_DENSENET_RUN
+    assert recovery_run in available_runs, 'Run atau config.json tidak ditemukan.'
+    assert 'handoff_path' in globals() and 'train_dataset' in globals() and 'val_dataset' in globals(), 'Pulihkan handoff dan pipeline Phase 3 terlebih dahulu.'
+    assert 'checks' in globals() and checks and all(row[1] for row in checks), 'QC handoff belum lulus.'
+    recovery_config = json.loads((recovery_run / 'config.json').read_text(encoding='utf-8'))
+    assert recovery_config['model'] == 'DenseNet121'
+    assert recovery_config['handoff_archive'] == str(handoff_path), 'Arsip handoff tidak cocok dengan run ini.'
+    assert recovery_config['classes'] == list(CLASS_NAMES) and recovery_config['seed'] == SEED
+    assert recovery_config['image_size'] == IMG_SIZE and recovery_config['batch_size'] == BATCH
+    assert recovery_config['train_images'] == N_IMAGES['train'] and recovery_config['validation_images'] == N_IMAGES['val']
+    assert recovery_config['tensorflow_version'] == tf.__version__ and recovery_config['keras_version'] == tf.keras.__version__, 'Versi TensorFlow/Keras berbeda dari run.'
+    tf.keras.mixed_precision.set_global_policy(recovery_config['precision_policy'])
+    selection_path = recovery_run / 'selection.json'
+    recovery_selection = json.loads(selection_path.read_text(encoding='utf-8')) if selection_path.is_file() else None
+    if recovery_selection:
+        recovery_selected = recovery_run / Path(recovery_selection['checkpoint']).name
+        assert recovery_selected.name in ('warmup_best.keras', 'finetune_best.keras') and recovery_selected.is_file(), 'Checkpoint terpilih tidak ditemukan.'
+        recovery_model = tf.keras.models.load_model(recovery_selected, compile=False)
+    run_dir, config = recovery_run, recovery_config
+    warmup_checkpoint = run_dir / 'warmup_best.keras'
+    finetune_checkpoint = run_dir / 'finetune_best.keras'
+    if recovery_selection:
+        selection, selected_model_path, model = recovery_selection, recovery_selected, recovery_model
+        print('Checkpoint terpilih dimuat:', selected_model_path)
+        print('DenseNet-121 siap untuk langkah LWDN; tidak perlu menjalankan ulang training DenseNet.')
+    elif all((run_dir / n).is_file() for n in ('warmup.csv', 'finetune.csv', 'warmup_best.keras', 'finetune_best.keras')):
+        print('Kedua tahap tersedia. Jalankan cell Memilih checkpoint berdasarkan validation.')
+    else:
+        print('Run belum lengkap. Jangan jalankan ulang cell fit pada folder ini karena dapat menimpa log.')
+        print('Pemulihan epoch training yang terputus belum otomatis tersedia.')
+
+
+===== Cell 61 | EH2_dSSZ6bTw =====
+# Memakai handoff yang sama tanpa mengubah Phase 1–3.
+assert config["model"] == "DenseNet121", "Jalankan konfigurasi Part I terlebih dahulu."
+assert "checks" in globals() and checks and all(row[1] for row in checks), "QC Phase 3 belum lulus."
+assert len(CLASS_NAMES) == 10 and list(CLASS_NAMES) == config["classes"]
+assert IMG_SIZE == config["image_size"] and BATCH == config["batch_size"]
+assert N_IMAGES["train"] == config["train_images"] and N_IMAGES["val"] == config["validation_images"]
+
+lwdn_train_dataset = train_dataset
+lwdn_val_dataset = val_dataset
+lwdn_check_images, lwdn_check_labels = next(iter(lwdn_val_dataset))
+tf.debugging.assert_shapes([
+    (lwdn_check_images, ("batch", IMG_SIZE, IMG_SIZE, 3)),
+    (lwdn_check_labels, ("batch", 10)),
+])
+tf.debugging.assert_all_finite(lwdn_check_images, "Input validation tidak finite.")
+tf.debugging.assert_all_finite(lwdn_check_labels, "Label validation tidak finite.")
+tf.debugging.assert_near(tf.reduce_sum(lwdn_check_labels, axis=1), tf.ones(tf.shape(lwdn_check_labels)[0]))
+tf.debugging.assert_equal(lwdn_check_labels, tf.one_hot(tf.argmax(lwdn_check_labels, axis=1), 10))
+
+print(f"Handoff LWDN: {N_IMAGES['train']} train | {N_IMAGES['val']} validation | 10 kelas")
+print(f"Input: {IMG_SIZE} × {IMG_SIZE} RGB | batch {BATCH} | preprocessing DenseNet")
+
+===== Cell 63 | C-Okyx5Vq-Yn =====
+# Memulihkan run dan checkpoint LWDN tanpa membuat eksperimen baru.
+from pathlib import Path
+import json
+import os
+import time
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+
+RECOVER_LWDN_RUN = "20261028T151525_228962Z"
+assert os.path.ismount("/content/drive"), "Hubungkan Google Drive terlebih dahulu."
+assert "config" in globals() and "lwdn_val_dataset" in globals(), "Pulihkan DenseNet-121 dan jalankan L01."
+assert Path(RECOVER_LWDN_RUN).name == RECOVER_LWDN_RUN, "Isi hanya nama folder run."
+recovered_run = Path("/content/drive/MyDrive/FGD6/runs/LWDN") / RECOVER_LWDN_RUN
+assert (recovered_run / "config.json").is_file(), "Run LWDN tidak ditemukan."
+recovered_config = json.loads((recovered_run / "config.json").read_text(encoding="utf-8"))
+assert recovered_config["model"] == "LWDN_adapted"
+for key in ("handoff_archive", "dataset_file_id", "classes", "seed", "image_size", "batch_size", "train_images", "validation_images", "preprocessing", "loss", "dropout", "warmup_epochs", "warmup_learning_rate", "finetune_epochs", "finetune_learning_rate", "precision_policy"):
+    assert recovered_config[key] == config[key], f"Konfigurasi berbeda: {key}"
+assert recovered_config["handoff_archive"] == str(handoff_path)
+assert recovered_config["tensorflow_version"] == tf.__version__ and recovered_config["keras_version"] == tf.keras.__version__, "Versi TensorFlow/Keras berubah."
+recovery_gpus = tf.config.list_physical_devices("GPU")
+recovery_device = tf.config.experimental.get_device_details(recovery_gpus[0]).get("device_name", recovery_gpus[0].name) if recovery_gpus else "CPU"
+assert recovery_device == recovered_config["gpu_name"], "Perangkat berubah; tinjau kondisi eksperimen sebelum melanjutkan."
+tf.keras.mixed_precision.set_global_policy(recovered_config["precision_policy"])
+recovered_timing = json.loads((recovered_run / "timing.json").read_text(encoding="utf-8"))
+assert "warmup_seconds" in recovered_timing, "Warm-up belum tercatat selesai; jangan menimpanya."
+
+recovered_candidates = []
+for stage in ("warmup", "finetune", "finetune_resume"):
+    checkpoint = recovered_run / f"{stage}_best.keras"
+    log_path = recovered_run / f"{stage}.csv"
+    if checkpoint.is_file() and log_path.is_file():
+        log = pd.read_csv(log_path)
+        assert not log.empty and np.isfinite(log[["epoch", "loss", "val_loss", "val_accuracy"]].to_numpy()).all(), f"Log {stage} tidak valid."
+        best = log.loc[log["val_loss"].idxmin()]
+        recovered_candidates.append({"stage": stage, "checkpoint": checkpoint, "epoch": int(best["epoch"]) + 1, "val_loss": float(best["val_loss"]), "val_accuracy": float(best["val_accuracy"])})
+assert any(row["stage"] == "warmup" for row in recovered_candidates), "Artefak warm-up tidak lengkap."
+finetune_candidates = [row for row in recovered_candidates if row["stage"] != "warmup"]
+recovered_checkpoint = min(finetune_candidates or recovered_candidates, key=lambda row: row["val_loss"])
+recovered_model = tf.keras.models.load_model(recovered_checkpoint["checkpoint"])
+assert recovered_model.name == "herbal_lwdn_adapted" and recovered_model.count_params() == 1644938
+assert recovered_model.input_shape[1:] == (IMG_SIZE, IMG_SIZE, 3) and recovered_model.output_shape[-1] == len(CLASS_NAMES)
+assert recovered_model.optimizer is not None, "Optimizer checkpoint tidak tersedia."
+
+lwdn_run_dir, lwdn_config, lwdn_model = recovered_run, recovered_config, recovered_model
+lwdn_run_id = lwdn_run_dir.name
+lwdn_warmup_checkpoint = lwdn_run_dir / "warmup_best.keras"
+lwdn_warmup_seconds = recovered_timing["warmup_seconds"]
+lwdn_timing = recovered_timing
+lwdn_resume_epoch = recovered_checkpoint["epoch"] if finetune_candidates else 0
+lwdn_resume_best_loss = min(row["val_loss"] for row in recovered_candidates)
+lwdn_recovered = True
+print("Run LWDN dipulihkan:", lwdn_run_dir)
+print(f"Checkpoint: {recovered_checkpoint['stage']} | epoch {recovered_checkpoint['epoch']} | val_accuracy {recovered_checkpoint['val_accuracy']:.2%}")
+print("Warm-up tidak perlu diulang. Jalankan pemeriksaan di bawah, lalu L06; L02-L05 akan dilewati.")
+print("Jika backup kelanjutan tersedia, L06 memulihkan epoch terakhir otomatis.")
+
+===== Cell 65 | xv-9AMNapskJ =====
+# Memastikan model yang dipulihkan cocok dengan data dan log, tanpa training.
+assert lwdn_recovered and lwdn_run_dir == recovered_run
+assert lwdn_warmup_checkpoint.is_file() and recovered_checkpoint["checkpoint"].is_file()
+assert all(name in globals() for name in ("lwdn_config", "lwdn_model", "lwdn_train_dataset", "lwdn_val_dataset", "lwdn_resume_epoch"))
+if lwdn_resume_epoch > 0:
+    expected_iterations = lwdn_resume_epoch * ((N_IMAGES["train"] + BATCH - 1) // BATCH)
+    assert int(lwdn_model.optimizer.iterations.numpy()) == expected_iterations, "State optimizer tidak cocok dengan epoch checkpoint."
+lwdn_recovery_metrics = lwdn_model.evaluate(lwdn_val_dataset, return_dict=True, verbose=0)
+assert np.isfinite(list(lwdn_recovery_metrics.values())).all()
+assert np.isclose(lwdn_recovery_metrics["loss"], recovered_checkpoint["val_loss"], rtol=1e-3, atol=1e-4), "Loss checkpoint berbeda dari log."
+assert np.isclose(lwdn_recovery_metrics["accuracy"], recovered_checkpoint["val_accuracy"], atol=1e-5), "Accuracy checkpoint berbeda dari log."
+print(f"Pemulihan LWDN LULUS | validation accuracy {lwdn_recovery_metrics['accuracy']:.2%} | loss {lwdn_recovery_metrics['loss']:.4f}")
+print(f"Kelanjutan dari epoch tersimpan {lwdn_resume_epoch}; batas akhir tetap {lwdn_config['finetune_epochs']} epoch.")
+
+===== Cell 67 | IveMZXXm6mkG =====
+# Mempertahankan run yang dipulihkan; eksperimen baru harus dipilih sengaja.
+START_NEW_LWDN_RUN = False
+if globals().get("lwdn_recovered", False):
+    print("Memakai run LWDN yang dipulihkan:", lwdn_run_dir)
+else:
+    assert START_NEW_LWDN_RUN, "Untuk melanjutkan, jalankan Pulihkan run LWDN. Ubah flag hanya untuk eksperimen baru."
+    # Mencatat eksperimen baru; jalankan hanya setelah training Part I selesai.
+    import json
+    import platform
+    import time
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    assert "selected_model_path" in globals() and selected_model_path.is_file() and selected_model_path.parent == run_dir, (
+        "Selesaikan pemilihan checkpoint DenseNet-121 pada run Part I terlebih dahulu."
+    )
+    lwdn_gpus = tf.config.list_physical_devices("GPU")
+    lwdn_gpu_details = tf.config.experimental.get_device_details(lwdn_gpus[0]) if lwdn_gpus else {}
+    lwdn_device = lwdn_gpu_details.get("device_name", lwdn_gpus[0].name if lwdn_gpus else "CPU")
+    assert lwdn_device == config["gpu_name"], "Perangkat berubah; tinjau kesetaraan eksperimen terlebih dahulu."
+    assert tf.keras.mixed_precision.global_policy().name == config["precision_policy"], "Precision berbeda dari baseline."
+    assert tf.__version__ == config["tensorflow_version"] and tf.keras.__version__ == config["keras_version"]
+    tf.keras.utils.set_random_seed(config["seed"])
+
+    RUNS_ROOT = Path("/content/drive/MyDrive/FGD6/runs")
+
+    lwdn_config = {
+        **config,
+        "model": "LWDN_adapted",
+        "paper_doi": "10.1007/s41348-024-00915-z",
+        "branch_cutoff": "conv3_block4_concat",
+        "branches": 2,
+        "fusion_axis": -1,
+        "head_units": [512, 256],
+        "finetune_block": "conv3_",
+        "finetune_branches": ["lwdn_branch_1", "lwdn_branch_2"],
+        "python_version": platform.python_version(),
+        "gpu_name": lwdn_device,
+        "compute_capability": lwdn_gpu_details.get("compute_capability"),
+    }
+    lwdn_run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
+    lwdn_run_dir = RUNS_ROOT / "LWDN" / lwdn_run_id
+    lwdn_run_dir.mkdir(parents=True, exist_ok=False)
+    (lwdn_run_dir / "config.json").write_text(json.dumps(lwdn_config, indent=2), encoding="utf-8")
+    (lwdn_run_dir / "classes.json").write_text(json.dumps(list(CLASS_NAMES), indent=2), encoding="utf-8")
+    print(f"Konfigurasi LWDN disimpan | {lwdn_device} | {lwdn_config['precision_policy']}")
+    lwdn_resume_epoch = 0
+    lwdn_recovered = False
+
+===== Cell 73 | 4ppkC8r97Af4 =====
+# Optimizer dan blok fine-tuning dari checkpoint tidak diinisialisasi ulang.
+if globals().get("lwdn_recovered", False) and lwdn_resume_epoch > 0:
+    print("L05 dilewati: bobot dan optimizer fine-tuning sudah dipulihkan.")
+else:
+    # Menggunakan strategi blok terakhir; LWDN yang dipangkas tidak memiliki conv5_.
+    lwdn_model = tf.keras.models.load_model(lwdn_warmup_checkpoint, compile=False)
+    lwdn_branches = [lwdn_model.get_layer(name) for name in lwdn_config["finetune_branches"]]
+    for lwdn_branch in lwdn_branches:
+        lwdn_branch.trainable = True
+        for layer in lwdn_branch.layers:
+            layer.trainable = (
+                layer.name.startswith(lwdn_config["finetune_block"])
+                and not isinstance(layer, tf.keras.layers.BatchNormalization)
+            )
+        assert lwdn_branch.trainable_weights, "Tidak ada bobot backbone yang dibuka."
+        assert all(
+            not layer.trainable
+            for layer in lwdn_branch.layers
+            if isinstance(layer, tf.keras.layers.BatchNormalization)
+        )
+        assert all(layer.name.startswith("conv3_") for layer in lwdn_branch.layers if layer.trainable)
+
+    lwdn_model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=lwdn_config["finetune_learning_rate"]),
+        loss=lwdn_config["loss"],
+        metrics=["accuracy"],
+    )
+    print("Blok conv3_ kedua cabang siap dilatih; BatchNormalization beku; optimizer Adam baru.")
+    lwdn_resume_epoch = 0
+
+===== Cell 76 | rYntioEe7I7e =====
+# Melanjutkan fine-tuning dan menyimpan backup pada akhir setiap epoch.
+assert "lwdn_run_dir" in globals() and "lwdn_model" in globals(), "Jalankan pemulihan LWDN dan verifikasinya dahulu."
+assert np.isclose(float(tf.keras.backend.get_value(lwdn_model.optimizer.learning_rate)), lwdn_config["finetune_learning_rate"]), "Model belum pada tahap fine-tuning; jalankan L05."
+original_backup = lwdn_run_dir / "finetune_backup"
+lwdn_stage_name = "finetune_resume" if (lwdn_run_dir / "finetune.csv").exists() and not original_backup.is_dir() else "finetune"
+lwdn_stage_log = lwdn_run_dir / f"{lwdn_stage_name}.csv"
+lwdn_finetune_checkpoint = lwdn_run_dir / f"{lwdn_stage_name}_best.keras"
+lwdn_stage_backup = lwdn_run_dir / f"{lwdn_stage_name}_backup"
+lwdn_stage_complete = lwdn_run_dir / f"{lwdn_stage_name}_complete.json"
+if lwdn_stage_complete.is_file() or lwdn_timing.get("finetune_seconds") is not None:
+    print("Fine-tuning sudah selesai. Jalankan L07; training tidak diulang.")
+else:
+    assert not lwdn_stage_log.exists() or lwdn_stage_backup.is_dir(), "Log kelanjutan ada tetapi backup hilang; jangan menimpa artefak."
+    lwdn_finetune_start = time.perf_counter()
+    lwdn_history_finetune = lwdn_model.fit(
+        lwdn_train_dataset,
+        validation_data=lwdn_val_dataset,
+        initial_epoch=globals().get("lwdn_resume_epoch", 0),
+        epochs=lwdn_config["finetune_epochs"],
+        callbacks=[
+            tf.keras.callbacks.ModelCheckpoint(
+                str(lwdn_finetune_checkpoint), monitor="val_loss", mode="min", save_best_only=True,
+                initial_value_threshold=globals().get("lwdn_resume_best_loss"),
+            ),
+            tf.keras.callbacks.EarlyStopping(monitor="val_loss", mode="min", patience=lwdn_config["finetune_patience"]),
+            tf.keras.callbacks.CSVLogger(str(lwdn_stage_log), append=True),
+            tf.keras.callbacks.BackupAndRestore(str(lwdn_stage_backup), double_checkpoint=True, delete_checkpoint=False),
+            tf.keras.callbacks.TerminateOnNaN(),
+        ],
+    )
+    lwdn_finetune_seconds = time.perf_counter() - lwdn_finetune_start
+    lwdn_stage_history = pd.read_csv(lwdn_stage_log)
+    assert not lwdn_stage_history.empty and np.isfinite(lwdn_stage_history[["loss", "val_loss"]].to_numpy()).all()
+    lwdn_stage_complete.write_text(json.dumps({
+        "completed": True,
+        "initial_epoch_requested": globals().get("lwdn_resume_epoch", 0),
+        "last_logged_epoch": int(lwdn_stage_history["epoch"].max()) + 1,
+        "training_seconds_this_session": lwdn_finetune_seconds,
+        "total_training_seconds": None if globals().get("lwdn_recovered", False) else lwdn_warmup_seconds + lwdn_finetune_seconds,
+    }, indent=2), encoding="utf-8")
+    print("Fine-tuning selesai. Log lama dipertahankan; jalankan L07 untuk memilih checkpoint.")
+
+===== Cell 78 | PctHt3d17SUt =====
+# Memilih checkpoint dari log tersimpan, lalu memeriksa ulang pada validation.
+assert "lwdn_run_dir" in globals(), "Jalankan pemulihan LWDN terlebih dahulu."
+assert any(lwdn_run_dir.glob("finetune*_complete.json")) or lwdn_timing.get("finetune_seconds") is not None, "Fine-tuning belum tercatat selesai. Pulihkan run dan lanjutkan L06 dahulu."
+lwdn_candidates = []
+for stage, filename in (("warm-up", "warmup"), ("fine-tuning", "finetune"), ("fine-tuning lanjutan", "finetune_resume")):
+    if filename == "finetune_resume" and not (lwdn_run_dir / "finetune_resume_best.keras").is_file():
+        continue
+    lwdn_log = pd.read_csv(lwdn_run_dir / f"{filename}.csv")
+    lwdn_checkpoint = lwdn_run_dir / f"{filename}_best.keras"
+    assert not lwdn_log.empty and lwdn_checkpoint.is_file(), f"Artefak {stage} belum lengkap."
+    assert np.isfinite(lwdn_log[["loss", "val_loss"]].to_numpy()).all(), f"Log {stage} tidak valid."
+    lwdn_best_row = lwdn_log.loc[lwdn_log["val_loss"].idxmin()]
+    lwdn_candidates.append({
+        "stage": stage,
+        "epoch_in_stage": int(lwdn_best_row["epoch"]) + 1,
+        "val_loss": float(lwdn_best_row["val_loss"]),
+        "checkpoint": str(lwdn_checkpoint),
+    })
+
+lwdn_selection = min(lwdn_candidates, key=lambda candidate: candidate["val_loss"])
+lwdn_selected_model_path = lwdn_run_dir / (
+    Path(lwdn_selection["checkpoint"]).name
+)
+lwdn_model = tf.keras.models.load_model(lwdn_selected_model_path)
+lwdn_validation = lwdn_model.evaluate(lwdn_val_dataset, return_dict=True, verbose=0)
+assert np.isfinite(list(lwdn_validation.values())).all()
+assert np.isclose(lwdn_validation["loss"], lwdn_selection["val_loss"], rtol=1e-3, atol=1e-4), (
+    "Val_loss checkpoint tidak cocok dengan log; periksa handoff dan artefak."
+)
+lwdn_timing = json.loads((lwdn_run_dir / "timing.json").read_text(encoding="utf-8"))
+if (lwdn_run_dir / "finetune_resume.csv").is_file():
+    lwdn_timing.update(finetune_seconds=None, total_training_seconds=None)  # Durasi sesi lama yang terputus tidak tersedia.
+completion_file = lwdn_run_dir / "finetune_resume_complete.json"
+if not completion_file.is_file():
+    completion_file = lwdn_run_dir / "finetune_complete.json"
+if completion_file.is_file():
+    completion = json.loads(completion_file.read_text(encoding="utf-8"))
+    lwdn_timing["continuation_seconds_this_session"] = completion["training_seconds_this_session"]
+    lwdn_timing["total_training_seconds"] = completion["total_training_seconds"]
+    lwdn_timing["finetune_seconds"] = completion["training_seconds_this_session"] if completion["total_training_seconds"] is not None else None
+lwdn_selection.update({
+    **lwdn_timing,
+    "model": lwdn_config["model"],
+    "verified_val_loss": float(lwdn_validation["loss"]),
+    "validation_accuracy": float(lwdn_validation["accuracy"]),
+    "parameters": lwdn_model.count_params(),
+    "checkpoint_bytes": lwdn_selected_model_path.stat().st_size,
+    "test_evaluated": False,
+})
+(lwdn_run_dir / "selection.json").write_text(json.dumps(lwdn_selection, indent=2), encoding="utf-8")
+print(f"Checkpoint LWDN: {lwdn_selection['stage']} | epoch {lwdn_selection['epoch_in_stage']} | val_loss {lwdn_selection['val_loss']:.4f}")
+print(f"Validation accuracy: {lwdn_validation['accuracy']:.2%} | parameter: {lwdn_model.count_params():,}")
+print("Artefak LWDN:", lwdn_run_dir)
+
