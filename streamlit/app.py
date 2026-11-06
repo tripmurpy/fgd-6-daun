@@ -1,4 +1,4 @@
-"""Inferensi DenseNet-121 untuk foto daun."""
+"""Inferensi LWDN untuk foto daun."""
 
 from io import BytesIO
 import json
@@ -15,6 +15,10 @@ import streamlit as st
 MAX_FILES = 20
 MAX_BYTES = 10 * 1024 * 1024
 MAX_PIXELS = 20_000_000
+IMAGE_SIZE = 224
+PREVIEW_SIZE = 1000
+# shortcut: skor softmax bisa tinggi pada foto asing; kalibrasi dengan foto berlabel di dalam dan di luar 10 kelas.
+MIN_LEAF_SCORE = 0.85
 MODEL_DIR = Path(__file__).with_name("model")
 CLASS_NAMES = json.loads((MODEL_DIR / "classes.json").read_text(encoding="utf-8"))
 PLANT_INFO = json.loads((MODEL_DIR / "plant_info.json").read_text(encoding="utf-8"))
@@ -23,7 +27,7 @@ if set(CLASS_NAMES) != set(PLANT_INFO):
 
 
 def read_image(data):
-    """Validasi isi gambar dan buat pratinjau dengan orientasi yang benar."""
+    """Validasi foto, lalu hasilkan input model dan pratinjau dari satu dekode."""
     if len(data) > MAX_BYTES:
         raise ValueError("Ukuran foto melebihi 10 MB. Pilih foto yang lebih kecil.")
     try:
@@ -36,9 +40,21 @@ def read_image(data):
                     raise ValueError("Resolusi foto terlalu besar. Gunakan maksimal 20 megapiksel.")
                 image.verify()
             with Image.open(BytesIO(data)) as image:
-                preview = ImageOps.exif_transpose(image).convert("RGB")
-                preview.thumbnail((1000, 1000))
-                return preview
+                ImageOps.exif_transpose(image, in_place=True)
+                if image.mode != "RGB":
+                    image = image.convert("RGB")
+                scale = min(1, PREVIEW_SIZE / max(image.size))
+                preview = image if scale == 1 else image.resize(
+                    tuple(max(1, round(side * scale)) for side in image.size), reducing_gap=2
+                )
+                preview_bytes = BytesIO()
+                preview.save(preview_bytes, format="JPEG")
+
+                image.thumbnail((IMAGE_SIZE, IMAGE_SIZE), Image.Resampling.LANCZOS)
+                canvas = Image.new("RGB", (IMAGE_SIZE, IMAGE_SIZE), "white")
+                canvas.paste(image, ((IMAGE_SIZE - image.width) // 2, (IMAGE_SIZE - image.height) // 2))
+                # Ekspor Kaggle mengharapkan RGB 0–255; normalisasi sudah ada di model.
+                return np.asarray(canvas, dtype=np.float32)[None, ...], preview_bytes.getvalue()
     except (UnidentifiedImageError, OSError, SyntaxError) as error:
         raise ValueError("Foto tidak dapat dibaca. Coba unggah ulang atau pilih foto lain.") from error
     except (Image.DecompressionBombWarning, Image.DecompressionBombError) as error:
@@ -49,26 +65,28 @@ def read_image(data):
 def load_model():
     import tensorflow as tf
 
-    return tf.keras.models.load_model(MODEL_DIR / "densenet121.keras", compile=False)
+    # Paket ekspor FGD-6: 20261106T034140Z_1fda11bd.
+    model = tf.keras.models.load_model(MODEL_DIR / "lwdn_v4.keras", compile=False)
+    if model.input_shape != (None, IMAGE_SIZE, IMAGE_SIZE, 3) or model.output_shape != (None, len(CLASS_NAMES)):
+        raise ValueError("Bentuk input atau output model tidak sesuai dengan aplikasi.")
+
+    @tf.function(input_signature=[tf.TensorSpec((1, IMAGE_SIZE, IMAGE_SIZE, 3), tf.float32)], autograph=False)
+    def forward(batch):
+        return model(batch, training=False)
+
+    return forward
 
 
-def predict(data, model):
-    from tensorflow.keras.applications.densenet import preprocess_input
-
-    with Image.open(BytesIO(data)) as image:
-        image.draft("RGB", (448, 448))
-        image = ImageOps.exif_transpose(image).convert("RGB")
-        image.thumbnail((224, 224), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", (224, 224), "white")
-    canvas.paste(image, ((224 - image.width) // 2, (224 - image.height) // 2))
-    batch = preprocess_input(np.asarray(canvas, dtype="float32")[None, ...])
+def predict(batch, forward):
+    """Berikan label hanya jika skor kelas tertinggi mencapai ambang."""
     start = perf_counter()
-    probabilities = model(batch, training=False).numpy()[0]
+    probabilities = forward(batch).numpy()[0]
     elapsed_ms = (perf_counter() - start) * 1000
     if probabilities.shape != (len(CLASS_NAMES),) or not np.isfinite(probabilities).all():
         raise ValueError("Keluaran model tidak valid.")
     index = int(np.argmax(probabilities))
-    return CLASS_NAMES[index], float(probabilities[index]), elapsed_ms
+    score = float(probabilities[index])
+    return CLASS_NAMES[index] if score >= MIN_LEAF_SCORE else None, score, elapsed_ms
 
 
 def main():
@@ -106,7 +124,8 @@ def main():
 
     st.html('<div class="brand">HerbLeaf AI <small>Tanaman obat Indonesia</small></div>')
     st.title("HerbLeaf AI")
-    st.html('<p class="intro">Unggah foto daun untuk melihat prediksi DenseNet-121 dan informasi tanamannya.</p>')
+    st.html('<p class="intro">Unggah foto satu daun untuk melihat prediksi LWDN dan informasi tanamannya.</p>')
+    st.caption("Jenis daun yang didukung: " + ", ".join(CLASS_NAMES) + ".")
 
     with st.container(key="upload"):
         st.html('<h2>Masukan foto daun</h2>')
@@ -123,24 +142,25 @@ def main():
         if too_many:
             st.warning("Folder berisi lebih dari 20 foto. Pilih folder yang lebih kecil.")
         signature = (mode, tuple((file.file_id, file.name, file.size) for file in files))
-        if st.button("Prediksi", type="primary", icon=":material/eco:", width="stretch", disabled=not files or too_many):
+        submitted = st.button("Prediksi", type="primary", icon=":material/eco:", width="stretch", disabled=not files or too_many)
+        if submitted or st.session_state.get("processed") != signature:
             st.session_state.pop("processed", None)
-            with st.status("Memuat gambar...", expanded=True) as status:
+            st.session_state.pop("predictions", None)
+        if submitted:
+            with st.status("Memproses foto...", expanded=True) as status:
                 try:
-                    model = None
+                    forward = None
                     predictions = {}
-                    for file in files:
-                        status.update(label="Memuat gambar...")
-                        data = file.getvalue()
+                    for i, file in enumerate(files, start=1):
+                        status.update(label=f"Memproses foto {i} dari {len(files)}...")
                         try:
-                            read_image(data)
+                            batch, preview = read_image(file.getvalue())
                         except ValueError as error:
                             predictions[file.file_id] = str(error)
                             continue
-                        status.update(label="Memprediksi gambar...")
-                        if model is None:
-                            model = load_model()
-                        predictions[file.file_id] = predict(data, model)
+                        if forward is None:
+                            forward = load_model()
+                        predictions[file.file_id] = (preview, *predict(batch, forward))
                     st.session_state["predictions"] = predictions
                     st.session_state["processed"] = signature
                     status.update(label="Prediksi selesai", state="complete", expanded=False)
@@ -160,17 +180,21 @@ def main():
                 if isinstance(prediction, str):
                     st.error(prediction)
                     continue
-                label, confidence, elapsed_ms = prediction
+                preview, label, score, elapsed_ms = prediction
                 image_column, result_column = st.columns([2, 3], gap="large")
                 with image_column:
-                    st.image(read_image(file.getvalue()), width="stretch")
+                    st.image(BytesIO(preview), output_format="JPEG", width="stretch")
                 with result_column:
-                    st.markdown(f"**Nama daun:** {label}")
-                    st.markdown(f"**Nama latin:** *{PLANT_INFO[label]['latin']}*")
-                    st.markdown("**Khasiat yang diteliti:**")
-                    st.markdown("\n".join(f"- {benefit}" for benefit in PLANT_INFO[label]["benefits"]))
-                    st.caption(f"Keyakinan: {confidence:.1%} · Waktu inferensi: {elapsed_ms:.1f} ms")
-                    st.caption("Ringkasan penelitian dari tim; bagian tanaman dan tingkat bukti berbeda. Bukan saran medis.")
+                    if label is None:
+                        st.warning("Foto tidak dikenali. Foto mungkin di luar 10 jenis daun yang didukung, atau daunnya kurang jelas.")
+                        st.caption("Coba unggah foto satu daun yang tajam dengan latar polos.")
+                    else:
+                        st.markdown(f"**Nama daun:** {label}")
+                        st.markdown(f"**Nama latin:** *{PLANT_INFO[label]['latin']}*")
+                        st.markdown("**Khasiat yang diteliti:**")
+                        st.markdown("\n".join(f"- {benefit}" for benefit in PLANT_INFO[label]["benefits"]))
+                        st.caption("Ringkasan penelitian dari tim; bagian tanaman dan tingkat bukti berbeda. Bukan saran medis.")
+                    st.caption(f"Skor model: {score:.1%} · Waktu inferensi: {elapsed_ms:.1f} ms")
                 st.divider()
 
     st.html('<p class="footer">FGD Kelompok 6 · Pengenalan daun tanaman obat</p>')
